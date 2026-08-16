@@ -11,6 +11,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from .context import ContextEngine
+from .intervention import InterventionEngine
+from .memory import MemoryStore
+
 
 @dataclass
 class SituatedEvent:
@@ -47,29 +51,60 @@ class SageRuntime:
         self.running = False
         self.event_history: list[SituatedEvent] = []
 
+        self.context = ContextEngine()
+        self.intervention = InterventionEngine()
+        self.memory = MemoryStore()
+
     def start(self):
         self.running = True
+
         return {
             "status": "running",
-            "system": "sage-situated-companion"
+            "system": "sage-situated-companion",
         }
 
     def stop(self):
         self.running = False
+
         return {
             "status": "stopped",
-            "system": "sage-situated-companion"
+            "system": "sage-situated-companion",
         }
 
     def ingest_event(self, event: SituatedEvent):
+        """
+        Receive one situated event, update runtime and persistent context,
+        then ask the intervention engine what Sage should do.
+        """
+
         self.event_history.append(event)
         self.state.last_event = event
 
         self._update_situated_state(event)
 
-        return self.evaluate_event(event)
+        context_snapshot = self.context.apply_event(
+            event_type=event.event_type,
+            payload=event.payload,
+        )
+
+        decision = self.intervention.evaluate(
+            event_type=event.event_type,
+            payload=event.payload,
+            confidence=event.confidence,
+            safety_level=context_snapshot.safety_level,
+            activity=context_snapshot.activity,
+            conversation_active=bool(
+                context_snapshot.conversation_topic
+            ),
+        )
+
+        return decision
 
     def _update_situated_state(self, event: SituatedEvent):
+        """
+        Maintain the runtime's lightweight current-state representation.
+        """
+
         if event.event_type == "location":
             self.state.location = event.payload.get("location")
 
@@ -79,11 +114,59 @@ class SageRuntime:
         elif event.event_type == "conversation":
             self.state.conversation_topic = event.payload.get("topic")
 
+        elif event.event_type == "conversation_interrupted":
+            self.state.interrupted_topic = (
+                event.payload.get("topic")
+                or self.state.conversation_topic
+            )
+
+        elif event.event_type == "conversation_resumed":
+            if self.state.interrupted_topic:
+                self.state.conversation_topic = (
+                    self.state.interrupted_topic
+                )
+
+            self.state.interrupted_topic = None
+
         elif event.event_type == "safety":
-            self.state.safety_level = float(
+            self.state.safety_level = self._clamp(
                 event.payload.get("severity", 0.0)
             )
 
+    def snapshot(self) -> CompanionState:
+        """
+        Return the runtime's current situated state.
+        """
+
+        return self.state
+
+    @staticmethod
+    def _clamp(value: float) -> float:
+        """
+        Clamp numeric confidence/safety values to the range 0.0–1.0.
+        """
+
+        return max(0.0, min(1.0, float(value)))
+
+
+if __name__ == "__main__":
+    sage = SageRuntime()
+
+    print(sage.start())
+
+    result = sage.ingest_event(
+        SituatedEvent(
+            source="bike_unit",
+            event_type="activity",
+            payload={
+                "activity": "cycling",
+            },
+            confidence=0.97,
+        )
+    )
+
+    print(result)
+self.memory.remember(
     def evaluate_event(self, event: SituatedEvent):
         """
         Temporary baseline decision layer.
