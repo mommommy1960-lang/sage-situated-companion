@@ -44,6 +44,9 @@ class SageRuntime:
     Sensor and software events enter here and are transformed into
     persistent situated state before intervention logic determines
     whether Sage should remain silent, respond, or proactively interrupt.
+
+    Significant situated events and intervention decisions are also
+    recorded by the persistent memory engine.
     """
 
     def __init__(self):
@@ -74,7 +77,8 @@ class SageRuntime:
     def ingest_event(self, event: SituatedEvent):
         """
         Receive one situated event, update runtime and persistent context,
-        then ask the intervention engine what Sage should do.
+        evaluate whether intervention is warranted, preserve the event
+        in persistent memory, and return the resulting decision.
         """
 
         self.event_history.append(event)
@@ -96,6 +100,22 @@ class SageRuntime:
             conversation_active=bool(
                 context_snapshot.conversation_topic
             ),
+        )
+
+        self.memory.remember(
+            content=f"{event.event_type}: {event.payload}",
+            category="situated_event",
+            importance=max(
+                event.confidence,
+                context_snapshot.safety_level,
+            ),
+            metadata={
+                "source": event.source,
+                "decision_action": decision.action.value,
+                "decision_reason": decision.reason,
+                "decision_priority": decision.priority,
+                "event_timestamp": event.timestamp.isoformat(),
+            },
         )
 
         return decision
@@ -143,7 +163,7 @@ class SageRuntime:
     @staticmethod
     def _clamp(value: float) -> float:
         """
-        Clamp numeric confidence/safety values to the range 0.0–1.0.
+        Clamp numeric confidence and safety values to 0.0 through 1.0.
         """
 
         return max(0.0, min(1.0, float(value)))
@@ -166,3 +186,4 @@ if __name__ == "__main__":
     )
 
     print(result)
+    print(sage.memory.summary())
