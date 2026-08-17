@@ -14,7 +14,6 @@ from typing import Any
 from .context import ContextEngine
 from .intervention import InterventionEngine
 from .memory import MemoryStore
-from .personality import PersonalityEngine, ExpressionContext
 
 
 @dataclass
@@ -48,10 +47,6 @@ class SageRuntime:
 
     Significant situated events and intervention decisions are also
     recorded by the persistent memory engine.
-
-    Personality continuity is maintained independently from intervention
-    decisions so Sage can remain the same companion while adapting
-    communication style to the user's current situation.
     """
 
     def __init__(self):
@@ -62,7 +57,6 @@ class SageRuntime:
         self.context = ContextEngine()
         self.intervention = InterventionEngine()
         self.memory = MemoryStore()
-        self.personality = PersonalityEngine()
 
     def start(self):
         self.running = True
@@ -126,33 +120,6 @@ class SageRuntime:
 
         return decision
 
-    def render_message(
-        self,
-        message: str,
-        *,
-        user_attention_required: bool = False,
-    ) -> str:
-        """
-        Render a message through Sage's personality continuity engine.
-
-        The personality remains stable while communication mode changes
-        according to safety level, activity, and conversational state.
-        """
-
-        expression_context = ExpressionContext(
-            activity=self.state.activity,
-            safety_level=self.state.safety_level,
-            conversation_active=bool(
-                self.state.conversation_topic
-            ),
-            user_attention_required=user_attention_required,
-        )
-
-        return self.personality.render(
-            message,
-            expression_context,
-        )
-
     def _update_situated_state(self, event: SituatedEvent):
         """
         Maintain the runtime's lightweight current-state representation.
@@ -207,18 +174,7 @@ if __name__ == "__main__":
 
     print(sage.start())
 
-    sage.ingest_event(
-        SituatedEvent(
-            source="conversation",
-            event_type="conversation",
-            payload={
-                "topic": "quantum mechanics",
-            },
-            confidence=1.0,
-        )
-    )
-
-    sage.ingest_event(
+    result = sage.ingest_event(
         SituatedEvent(
             source="bike_unit",
             event_type="activity",
@@ -229,26 +185,5 @@ if __name__ == "__main__":
         )
     )
 
-    casual_message = sage.render_message(
-        "We're passing that bakery again."
-    )
-
-    sage.ingest_event(
-        SituatedEvent(
-            source="safety_monitor",
-            event_type="safety",
-            payload={
-                "severity": 0.95,
-            },
-            confidence=0.99,
-        )
-    )
-
-    safety_message = sage.render_message(
-        "Car approaching from the right.",
-        user_attention_required=True,
-    )
-
-    print("Casual:", casual_message)
-    print("Safety:", safety_message)
+    print(result)
     print(sage.memory.summary())
