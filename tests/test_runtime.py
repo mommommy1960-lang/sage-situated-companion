@@ -2,7 +2,8 @@
 Tests for the SAGE Situated Companion runtime.
 
 These tests verify that the runtime coordinates situated context,
-intervention decisions, persistent memory, and current state correctly.
+intervention decisions, persistent memory, personality continuity,
+and current state correctly.
 """
 
 from sage.runtime import SageRuntime, SituatedEvent
@@ -138,6 +139,8 @@ def test_event_is_recorded_in_memory():
     summary = sage.memory.summary()
 
     assert summary is not None
+
+
 def test_runtime_has_personality_engine():
     sage = SageRuntime()
 
