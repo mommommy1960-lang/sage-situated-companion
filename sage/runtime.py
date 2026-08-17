@@ -14,6 +14,7 @@ from typing import Any
 from .context import ContextEngine
 from .intervention import InterventionEngine
 from .memory import MemoryStore
+from .personality import PersonalityEngine, ExpressionContext
 
 
 @dataclass
@@ -45,8 +46,8 @@ class SageRuntime:
     persistent situated state before intervention logic determines
     whether Sage should remain silent, respond, or proactively interrupt.
 
-    Significant situated events and intervention decisions are also
-    recorded by the persistent memory engine.
+    Significant situated events and intervention decisions are recorded
+    by persistent memory, while personality controls expression mode.
     """
 
     def __init__(self):
@@ -57,6 +58,7 @@ class SageRuntime:
         self.context = ContextEngine()
         self.intervention = InterventionEngine()
         self.memory = MemoryStore()
+        self.personality = PersonalityEngine()
 
     def start(self):
         self.running = True
@@ -76,9 +78,9 @@ class SageRuntime:
 
     def ingest_event(self, event: SituatedEvent):
         """
-        Receive one situated event, update runtime and persistent context,
-        evaluate whether intervention is warranted, preserve the event
-        in persistent memory, and return the resulting decision.
+        Receive one situated event, update persistent context,
+        evaluate intervention priority, preserve the event in memory,
+        determine communication mode, and return the result.
         """
 
         self.event_history.append(event)
@@ -102,6 +104,21 @@ class SageRuntime:
             ),
         )
 
+        expression_context = ExpressionContext(
+            activity=context_snapshot.activity,
+            safety_level=context_snapshot.safety_level,
+            conversation_active=bool(
+                context_snapshot.conversation_topic
+            ),
+            user_attention_required=(
+                decision.action.value == "interrupt"
+            ),
+        )
+
+        communication_mode = self.personality.select_mode(
+            expression_context
+        )
+
         self.memory.remember(
             content=f"{event.event_type}: {event.payload}",
             category="situated_event",
@@ -114,11 +131,16 @@ class SageRuntime:
                 "decision_action": decision.action.value,
                 "decision_reason": decision.reason,
                 "decision_priority": decision.priority,
+                "communication_mode": communication_mode.value,
                 "event_timestamp": event.timestamp.isoformat(),
             },
         )
 
-        return decision
+        return {
+            "decision": decision,
+            "communication_mode": communication_mode,
+            "context": context_snapshot,
+        }
 
     def _update_situated_state(self, event: SituatedEvent):
         """
