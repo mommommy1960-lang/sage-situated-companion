@@ -138,3 +138,27 @@ def test_event_is_recorded_in_memory():
     summary = sage.memory.summary()
 
     assert summary is not None
+def test_runtime_has_personality_engine():
+    sage = SageRuntime()
+
+    assert sage.personality is not None
+    assert sage.personality.profile.name == "Sage"
+
+
+def test_runtime_personality_enters_safety_mode():
+    sage = SageRuntime()
+
+    sage.ingest_event(
+        SituatedEvent(
+            source="safety_monitor",
+            event_type="safety",
+            payload={"severity": 0.95},
+            confidence=0.99,
+        )
+    )
+
+    rendered = sage.render_message(
+        "Car approaching from the right."
+    )
+
+    assert rendered == "Car approaching from the right."
