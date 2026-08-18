@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+sage_memory.json
+.pytest_cache/
