@@ -69,6 +69,17 @@ class SageConsole:
             external_input
         )
 
+        # Retrieve relevant memories BEFORE processing event
+        # This way, memories are from previous interactions,
+        # not from the current event being processed
+        relevant_memories = (
+            self.runtime.memory.retrieve_relevant_memories(
+                query=message,
+                limit=3,
+                min_importance=0.4,
+            )
+        )
+
         runtime_result = self.runtime.ingest_event(
             event
         )
@@ -106,6 +117,7 @@ class SageConsole:
                     ),
                 },
                 communication_mode=communication_mode,
+                memories=relevant_memories,
             )
         )
 

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 import json
 import uuid
+import hashlib
 
 
 @dataclass
@@ -32,6 +33,7 @@ class Memory:
         default_factory=lambda: datetime.now(timezone.utc)
     )
     access_count: int = 0
+    explicit_remember: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -53,6 +55,55 @@ class Memory:
 
         return cls(**restored)
 
+    def compute_content_hash(self) -> str:
+        """
+        Compute a deterministic hash of the memory content.
+        Used for duplicate detection.
+        """
+        normalized = self.content.strip().lower()
+        return hashlib.md5(normalized.encode()).hexdigest()
+
+    @staticmethod
+    def assess_significance(
+        content: str,
+        category: str = "general",
+        confidence: float = 1.0,
+        explicit_remember: bool = False,
+    ) -> float:
+        """
+        Deterministically assess significance of a memory (0.0 to 1.0).
+        
+        Significance is based on:
+        - Explicit remember requests: always 1.0
+        - System/safety categories: elevated base significance
+        - Confidence level: multiplied with base significance
+        - Content length/structure: minimal adjustment
+        
+        This is deterministic and does not use external APIs or LLMs.
+        """
+        if explicit_remember:
+            return 1.0
+
+        # Base significance by category
+        base_significance = {
+            "safety": 0.95,
+            "system": 0.90,
+            "user_preference": 0.85,
+            "conversation": 0.50,
+            "situated_event": 0.60,
+            "general": 0.35,
+        }.get(category, 0.35)
+
+        # Apply confidence modifier
+        assessed = base_significance * max(0.0, min(1.0, confidence))
+
+        # Penalize very short or empty content slightly
+        if not content or len(content.strip()) < 3:
+            assessed *= 0.3
+
+        # Clamp to valid range
+        return max(0.0, min(1.0, assessed))
+
 
 class MemoryStore:
     """
@@ -68,21 +119,88 @@ class MemoryStore:
 
         self.load()
 
+    def _find_duplicate_memory(
+        self,
+        content: str,
+        category: str,
+        similarity_threshold: float = 0.95,
+    ) -> Memory | None:
+        """
+        Check if a similar memory already exists.
+        Returns the existing memory if found, None otherwise.
+        
+        This prevents obvious duplicates from accumulating.
+        """
+        # Normalize whitespace: convert multiple spaces to single space
+        normalized_content = ' '.join(
+            content.strip().lower().split()
+        )
+        new_hash = hashlib.md5(
+            normalized_content.encode()
+        ).hexdigest()
+
+        for memory in self.memories.values():
+            if memory.category != category:
+                continue
+
+            # Normalize existing memory content the same way
+            normalized_existing = ' '.join(
+                memory.content.strip().lower().split()
+            )
+            existing_hash = hashlib.md5(
+                normalized_existing.encode()
+            ).hexdigest()
+
+            if existing_hash == new_hash:
+                return memory
+
+        return None
+
     def remember(
         self,
         content: str,
         category: str = "general",
-        importance: float = 0.5,
+        importance: float | None = None,
         metadata: dict[str, Any] | None = None,
+        explicit_remember: bool = False,
+        confidence: float = 1.0,
     ) -> Memory:
+        """
+        Record a new memory.
+        
+        If no importance is provided, it is computed deterministically
+        from content, category, confidence, and explicit_remember flag.
+        
+        If a duplicate memory already exists in the same category,
+        that existing memory is returned instead.
+        """
 
-        importance = max(0.0, min(1.0, importance))
+        # Check for duplicates
+        duplicate = self._find_duplicate_memory(content, category)
+        if duplicate is not None:
+            # Update access count for existing memory
+            duplicate.access_count += 1
+            duplicate.last_accessed = datetime.now(timezone.utc)
+            self.save()
+            return duplicate
+
+        # Compute significance if not provided
+        if importance is None:
+            importance = Memory.assess_significance(
+                content=content,
+                category=category,
+                confidence=confidence,
+                explicit_remember=explicit_remember,
+            )
+        else:
+            importance = max(0.0, min(1.0, importance))
 
         memory = Memory(
             content=content,
             category=category,
             importance=importance,
             metadata=metadata or {},
+            explicit_remember=explicit_remember,
         )
 
         self.memories[memory.memory_id] = memory
@@ -122,6 +240,131 @@ class MemoryStore:
             key=lambda memory: (
                 memory.importance,
                 memory.created_at,
+            ),
+            reverse=True,
+        )
+
+        selected = results[:limit]
+
+        for memory in selected:
+            memory.access_count += 1
+            memory.last_accessed = datetime.now(timezone.utc)
+
+        if selected:
+            self.save()
+
+        return selected
+
+    def retrieve_relevant_memories(
+        self,
+        query: str | None = None,
+        context_keywords: list[str] | None = None,
+        limit: int = 5,
+        min_importance: float = 0.4,
+    ) -> list[Memory]:
+        """
+        Retrieve memories relevant to the current interaction.
+        
+        Filters by:
+        - Query text matching (if provided)
+        - Context keywords matching (if provided)
+        - Minimum importance threshold
+        - Sorted by importance and recency
+        
+        This is deterministic and testable. Empty query returns
+        no results to avoid dumping entire memory into every interaction.
+        
+        When a query or keywords are provided, only memories matching
+        those criteria are returned. No fallback to unrelated memories.
+        """
+        if not query and not context_keywords:
+            return []
+
+        results = list(self.memories.values())
+
+        # Filter by minimum importance
+        results = [
+            m for m in results
+            if m.importance >= min_importance
+        ]
+
+        # Filter by query text (strict: if query given, only return matches)
+        if query:
+            query_terms = query.lower().split()
+            # Filter out single-letter terms to avoid false substring matches
+            # (single letters often appear in other words as substrings)
+            query_terms = [t for t in query_terms if len(t) > 1]
+            if query_terms:
+                query_results = [
+                    m for m in results
+                    if any(
+                        term in m.content.lower()
+                        for term in query_terms
+                    )
+                ]
+                # No fallback: if query provided, only matching memories returned
+                results = query_results
+            else:
+                # If only single-letter terms, return empty
+                results = []
+
+        # Filter by context keywords (strict: if keywords given, only return matches)
+        if context_keywords:
+            context_keywords_lower = [
+                k.lower() for k in context_keywords
+            ]
+            context_results = [
+                m for m in results
+                if any(
+                    keyword in m.content.lower()
+                    for keyword in context_keywords_lower
+                )
+            ]
+            # No fallback: if keywords provided, only matching memories returned
+            results = context_results
+
+        # Sort by importance (desc), then recency (desc)
+        results.sort(
+            key=lambda m: (
+                m.importance,
+                m.created_at,
+            ),
+            reverse=True,
+        )
+
+        selected = results[:limit]
+
+        # Update access metrics
+        for memory in selected:
+            memory.access_count += 1
+            memory.last_accessed = datetime.now(timezone.utc)
+
+        if selected:
+            self.save()
+
+        return selected
+
+    def retrieve_memories_by_category(
+        self,
+        category: str,
+        limit: int = 5,
+        min_importance: float = 0.4,
+    ) -> list[Memory]:
+        """
+        Retrieve memories from a specific category.
+        
+        Sorted by importance and recency.
+        """
+        results = [
+            m for m in self.memories.values()
+            if m.category == category
+            and m.importance >= min_importance
+        ]
+
+        results.sort(
+            key=lambda m: (
+                m.importance,
+                m.created_at,
             ),
             reverse=True,
         )
