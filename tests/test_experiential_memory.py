@@ -14,6 +14,7 @@ import pytest
 from sage.memory import Memory, MemoryStore
 from sage.runtime import SageRuntime, SituatedEvent
 from apps.console import SageConsole
+from interfaces.basic_generation import BasicGenerationAdapter
 
 
 class TestMemorySignificanceAssessment:
@@ -502,6 +503,7 @@ class TestMemoryIntegrationWithConsole:
         console = SageConsole(
             runtime=runtime,
             preferred_address="Test",
+            generation_adapter=BasicGenerationAdapter(),
         )
 
         # Add a memory
@@ -529,6 +531,7 @@ class TestMemoryIntegrationWithConsole:
         console = SageConsole(
             runtime=runtime,
             preferred_address="Test",
+            generation_adapter=BasicGenerationAdapter(),
         )
 
         # Test a normal message
@@ -835,6 +838,7 @@ class TestConsoleRoundTripWithMemory:
         console = SageConsole(
             runtime=runtime,
             preferred_address="Test",
+            generation_adapter=BasicGenerationAdapter(),
         )
 
         # Step 1: Store an explicit user preference as memory
@@ -896,7 +900,10 @@ class TestConsoleRoundTripWithMemory:
         runtime.memory.storage_path = tmp_path / "different_memories.json"
         runtime.memory.memories.clear()
 
-        console = SageConsole(runtime=runtime)
+        console = SageConsole(
+            runtime=runtime,
+            generation_adapter=BasicGenerationAdapter(),
+        )
 
         # Store two different high-importance memories
         mem1 = runtime.memory.remember(
@@ -944,7 +951,10 @@ class TestConsoleRoundTripWithMemory:
         runtime.memory.storage_path = tmp_path / "safety_memory.json"
         runtime.memory.memories.clear()
 
-        console = SageConsole(runtime=runtime)
+        console = SageConsole(
+            runtime=runtime,
+            generation_adapter=BasicGenerationAdapter(),
+        )
 
         # Store a memory
         memory = runtime.memory.remember(
@@ -1075,13 +1085,18 @@ class TestConsolePublicAPIEndToEndCausality:
         Simplified version: Use console API to create memory,
         then verify automatic influence on second interaction.
         """
+        from interfaces.basic_generation import BasicGenerationAdapter
+
         # Create console with isolated temp memory store
         runtime = SageRuntime()
         storage_path = tmp_path / "console_auto_test.json"
         runtime.memory.storage_path = storage_path
         runtime.memory.memories.clear()
 
-        console = SageConsole(runtime=runtime)
+        console = SageConsole(
+            runtime=runtime,
+            generation_adapter=BasicGenerationAdapter(),
+        )
 
         # First message: communicate a preference
         msg1 = "I absolutely love hiking in the mountains"
@@ -1104,12 +1119,17 @@ class TestConsolePublicAPIEndToEndCausality:
         Prove that console's process_message() automatically retrieves
         memories without requiring manual retrieval steps.
         """
+        from interfaces.basic_generation import BasicGenerationAdapter
+
         runtime = SageRuntime()
         storage_path = tmp_path / "auto_retrieval.json"
         runtime.memory.storage_path = storage_path
         runtime.memory.memories.clear()
 
-        console = SageConsole(runtime=runtime)
+        console = SageConsole(
+            runtime=runtime,
+            generation_adapter=BasicGenerationAdapter(),
+        )
 
         # Manually store a high-importance memory
         runtime.memory.remember(
@@ -1132,6 +1152,8 @@ class TestConsolePublicAPIEndToEndCausality:
         Prove that memories persist across console instance reloads
         using the same storage path.
         """
+        from interfaces.basic_generation import BasicGenerationAdapter
+
         # Use a unique storage path for this test
         storage_path = tmp_path / "persistence_reload_test.json"
 
@@ -1141,7 +1163,10 @@ class TestConsolePublicAPIEndToEndCausality:
         runtime1.memory.memories.clear()
         runtime1.memory.save()  # Save empty state to file
 
-        console1 = SageConsole(runtime=runtime1)
+        console1 = SageConsole(
+            runtime=runtime1,
+            generation_adapter=BasicGenerationAdapter(),
+        )
 
         # Process message through console (stores memory in runtime)
         console1.process_message(
@@ -1167,7 +1192,10 @@ class TestConsolePublicAPIEndToEndCausality:
         runtime2.memory.memories.clear()  # Clear default
         runtime2.memory.load()  # Load from file
 
-        console2 = SageConsole(runtime=runtime2)
+        console2 = SageConsole(
+            runtime=runtime2,
+            generation_adapter=BasicGenerationAdapter(),
+        )
 
         # Verify the specific memory about color is present
         color_memories = [
