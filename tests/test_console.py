@@ -11,6 +11,8 @@ the verified core architecture.
 """
 
 from apps.console import SageConsole
+from interfaces.basic_generation import BasicGenerationAdapter
+from interfaces.openai_generation import OpenAIGenerationAdapter
 from sage.runtime import SageRuntime
 
 
@@ -238,3 +240,43 @@ def test_console_uses_complete_adapter_stack(
         console.output_adapter,
         BasicOutputAdapter,
     )
+
+
+def test_console_uses_explicit_generation_adapter(tmp_path):
+    """The caller should be able to inject a generation adapter directly."""
+    runtime = SageRuntime()
+    runtime.memory.storage_path = tmp_path / "explicit_adapter.json"
+    runtime.memory.memories.clear()
+
+    adapter = BasicGenerationAdapter()
+    console = SageConsole(
+        runtime=runtime,
+        preferred_address="Queen",
+        generation_adapter=adapter,
+    )
+
+    assert console.generation_adapter is adapter
+
+
+def test_console_defaults_to_basic_generation_without_api_key(tmp_path, monkeypatch):
+    """No API key should keep the deterministic fallback active."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    runtime = SageRuntime()
+    runtime.memory.storage_path = tmp_path / "basic_default.json"
+    runtime.memory.memories.clear()
+
+    console = SageConsole(runtime=runtime)
+
+    assert isinstance(console.generation_adapter, BasicGenerationAdapter)
+
+
+def test_console_selects_openai_generation_with_api_key(tmp_path, monkeypatch):
+    """A configured API key should enable the model-backed adapter."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    runtime = SageRuntime()
+    runtime.memory.storage_path = tmp_path / "openai_default.json"
+    runtime.memory.memories.clear()
+
+    console = SageConsole(runtime=runtime)
+
+    assert isinstance(console.generation_adapter, OpenAIGenerationAdapter)

@@ -53,9 +53,13 @@ class OpenAIGenerationAdapter(GenerationAdapter):
         context: dict[str, Any],
         personality: dict[str, Any],
         communication_mode: str,
+        memories: list[Any] | None = None,
     ) -> str:
         """
         Generate a SAGE response using the OpenAI Responses API.
+
+        Relevant memories are incorporated through model instructions/context,
+        not by mutating the user message with a raw remembered tag.
         """
 
         instruction = instruction.strip()
@@ -63,10 +67,13 @@ class OpenAIGenerationAdapter(GenerationAdapter):
         if not instruction:
             return ""
 
+        memory_context = self._extract_memory_context(memories)
+
         developer_instruction = self._build_instructions(
             context=context,
             personality=personality,
             communication_mode=communication_mode,
+            memory_context=memory_context,
         )
 
         response = self.client.responses.create(
@@ -78,11 +85,42 @@ class OpenAIGenerationAdapter(GenerationAdapter):
         return response.output_text.strip()
 
     @staticmethod
+    def _extract_memory_context(
+        memories: list[Any] | None,
+    ) -> list[str]:
+        """Normalize retrieved memory objects into instruction-safe text."""
+        if not memories:
+            return []
+
+        normalized: list[str] = []
+
+        for memory in memories:
+            if memory is None:
+                continue
+
+            content = getattr(memory, "content", None)
+            if not isinstance(content, str):
+                continue
+
+            cleaned = content.strip()
+            if not cleaned:
+                continue
+
+            importance = getattr(memory, "importance", 1.0)
+            if importance is not None and float(importance) < 0.4:
+                continue
+
+            normalized.append(cleaned)
+
+        return normalized[:3]
+
+    @staticmethod
     def _build_instructions(
         *,
         context: dict[str, Any],
         personality: dict[str, Any],
         communication_mode: str,
+        memory_context: list[str] | None = None,
     ) -> str:
         """
         Convert SAGE runtime state into model-generation constraints.
@@ -140,6 +178,11 @@ class OpenAIGenerationAdapter(GenerationAdapter):
                 f"Current conversation topic: "
                 f"{conversation_topic}."
             )
+
+        if memory_context and communication_mode != "safety":
+            lines.append("Relevant memory context:")
+            for memory in memory_context:
+                lines.append(f"- {memory}")
 
         if communication_mode == "safety":
             lines.append(

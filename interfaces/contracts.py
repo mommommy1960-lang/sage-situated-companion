@@ -142,9 +142,10 @@ class GenerationAdapter(ABC):
         context: dict[str, Any],
         personality: dict[str, Any],
         communication_mode: str,
+        memories: list[Any] | None = None,
     ) -> str:
         """
-        Generate content using situated and personality constraints.
+        Generate content using situated, memory, and personality constraints.
         """
 
         raise NotImplementedError

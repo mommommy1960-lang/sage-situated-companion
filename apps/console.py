@@ -9,10 +9,13 @@ The console composes the external interface adapters with SageRuntime
 without placing application-specific behavior inside the frozen core.
 """
 
+import os
+
 from interfaces.basic_generation import BasicGenerationAdapter
 from interfaces.basic_input import BasicInputAdapter
 from interfaces.basic_output import BasicOutputAdapter
 from interfaces.contracts import ExternalInput, OutputRequest
+from interfaces.openai_generation import OpenAIGenerationAdapter
 
 from sage.intervention import InterventionAction
 from sage.runtime import SageRuntime
@@ -32,13 +35,20 @@ class SageConsole:
         *,
         runtime: SageRuntime | None = None,
         preferred_address: str | None = None,
+        generation_adapter=None,
     ):
         self.runtime = runtime or SageRuntime()
         self.preferred_address = preferred_address
 
         self.input_adapter = BasicInputAdapter()
-        self.generation_adapter = BasicGenerationAdapter()
         self.output_adapter = BasicOutputAdapter()
+
+        if generation_adapter is not None:
+            self.generation_adapter = generation_adapter
+        elif os.getenv("OPENAI_API_KEY"):
+            self.generation_adapter = OpenAIGenerationAdapter()
+        else:
+            self.generation_adapter = BasicGenerationAdapter()
 
     def process_message(
         self,
