@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Commons Live Ensemble Overlay</title>
+<style>
+:root { --gold:#e8c36a; --ice:#9de4ff; --violet:#c7a4ff; --emerald:#8ae6b1; }
+*{box-sizing:border-box}
+body{margin:0;background:transparent;color:white;font-family:Inter,system-ui,sans-serif;overflow:hidden}
+#card{position:fixed;right:3vw;bottom:7vh;width:min(38vw,520px);min-height:150px;padding:20px 22px;border:1px solid rgba(255,255,255,.25);border-radius:24px;background:rgba(4,8,18,.82);backdrop-filter:blur(14px);box-shadow:0 20px 70px rgba(0,0,0,.4);opacity:0;transform:translateY(24px) scale(.98);transition:.28s}
+#card.show{opacity:1;transform:none}
+#name{font-size:30px;font-weight:800;letter-spacing:.03em;color:var(--gold)}
+#text{font-size:22px;line-height:1.35;margin-top:8px}
+#event{font-size:12px;opacity:.6;text-transform:uppercase;letter-spacing:.14em;margin-bottom:5px}
+#burst{position:fixed;inset:0;pointer-events:none;display:grid;place-items:center;font-size:110px;opacity:0}
+#burst.go{animation:pop 1.3s ease-out}
+@keyframes pop{0%{opacity:0;transform:scale(.2)}25%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:scale(1.9)}}
+</style>
+</head>
+<body>
+<div id="burst">✨</div>
+<div id="card">
+  <div id="event">LIVE CAST</div>
+  <div id="name">Sage</div>
+  <div id="text">Waiting for the room…</div>
+</div>
+<script>
+const card=document.getElementById('card');
+const nameEl=document.getElementById('name');
+const textEl=document.getElementById('text');
+const eventEl=document.getElementById('event');
+const burst=document.getElementById('burst');
+const colors={gold:'#e8c36a',ice:'#9de4ff',violet:'#c7a4ff',emerald:'#8ae6b1'};
+let hideTimer=null;
+
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=.96; u.pitch=1; u.volume=1;
+  speechSynthesis.speak(u);
+}
+function icon(animation){
+  return ({rose:'🌹',heart:'❤️',crown:'👑',hearts:'💕',aurora:'💎',snake:'🐍',follow:'✨',share:'📣'})[animation] || '✨';
+}
+function showCue(cue){
+  nameEl.textContent=cue.persona;
+  textEl.textContent=cue.text;
+  eventEl.textContent=(cue.meta?.source_event||'live cast').toUpperCase();
+  nameEl.style.color=colors[cue.meta?.accent]||colors.gold;
+  card.classList.add('show');
+  burst.textContent=icon(cue.animation);
+  burst.classList.remove('go');
+  void burst.offsetWidth;
+  burst.classList.add('go');
+  clearTimeout(hideTimer);
+  hideTimer=setTimeout(()=>card.classList.remove('show'), Math.max(6000, cue.text.length*65));
+  if(cue.speak!==false) speak(cue.text);
+}
+const es=new EventSource('/stream');
+es.onmessage=(e)=>{
+  try{showCue(JSON.parse(e.data));}catch(_){}
+};
+</script>
+</body>
+</html>
