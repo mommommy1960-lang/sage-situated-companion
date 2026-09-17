@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Commons Live Ensemble Control</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #0a0d12; color: #f4f6f8; }
+    main { max-width: 920px; margin: 0 auto; padding: 28px 18px 60px; }
+    h1 { margin: 0 0 6px; font-size: clamp(28px, 5vw, 48px); }
+    .sub { color: #adb7c3; margin-bottom: 24px; }
+    .card { background: #121823; border: 1px solid #273244; border-radius: 18px; padding: 20px; margin: 16px 0; box-shadow: 0 12px 35px rgba(0,0,0,.25); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    input { flex: 1; min-width: 220px; background: #0d121a; color: white; border: 1px solid #3a4659; border-radius: 12px; padding: 13px 14px; font-size: 16px; }
+    button, a.button { border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-block; }
+    .primary { background: #e8c66d; color: #111; }
+    .secondary { background: #263248; color: white; }
+    .danger { background: #6f2632; color: white; }
+    .cast { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 10px; }
+    .cast button { background: #1b2535; color: white; border: 1px solid #35435a; }
+    .status { padding: 12px 14px; background: #0d121a; border-radius: 12px; color: #cfd7e2; min-height: 22px; white-space: pre-wrap; }
+    .ok { color: #8ee6a8; }
+    .bad { color: #ff9aa8; }
+    code { background: #0d121a; padding: 2px 6px; border-radius: 6px; }
+    small { color: #95a1b0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>👑 Commons Live Ensemble</h1>
+  <div class="sub">Your local show-control room. Start the TikTok listener, test the cast, then open the transparent overlay.</div>
+
+  <section class="card">
+    <h2>1. Connect your TikTok LIVE</h2>
+    <div class="row">
+      <input id="username" value="user2885077566" aria-label="TikTok username" />
+      <button class="primary" onclick="startTikTok()">▶ START TIKTOK LISTENER</button>
+      <button class="danger" onclick="stopTikTok()">■ STOP</button>
+    </div>
+    <p><small>Go LIVE in TikTok first or immediately after pressing Start. This prototype uses an unofficial event reader, so TikTok can break it without warning.</small></p>
+    <div id="status" class="status">Checking status…</div>
+  </section>
+
+  <section class="card">
+    <h2>2. Test the cast</h2>
+    <p>These buttons send fake viewer comments so you can verify the show before exposing it to actual humanity.</p>
+    <div class="cast">
+      <button onclick="testPersona('sage','Sage, welcome everybody to the show.')">🦇 Test Sage</button>
+      <button onclick="testPersona('aurora','Aurora, give the audience a status check.')">💎 Test Aurora</button>
+      <button onclick="testPersona('maya','Maya, explain what this show is.')">🧠 Test Maya</button>
+      <button onclick="testPersona('serafina','Serafina, what is happening in the royal enclosure?')">🐍 Test Serafina</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. Put the cast on screen</h2>
+    <div class="row">
+      <a class="button secondary" href="/" target="_blank">🪟 OPEN TRANSPARENT OVERLAY</a>
+      <button class="secondary" onclick="copyOverlay()">📋 COPY OVERLAY URL</button>
+    </div>
+    <p><small>In TikTok LIVE Studio or OBS, add <code>http://127.0.0.1:8765/</code> as a Browser Source.</small></p>
+  </section>
+
+  <section class="card">
+    <h2>Audience commands</h2>
+    <p><code>!sage</code> &nbsp; <code>!aurora</code> &nbsp; <code>!maya</code> &nbsp; <code>!serafina</code> / <code>!snake</code></p>
+    <p><small>Public Aurora is intentionally a performance shell. It does not receive private engineering, credentials, or operational control.</small></p>
+  </section>
+</main>
+<script>
+async function refreshStatus(){
+  try {
+    const r = await fetch('/control/status');
+    const d = await r.json();
+    const el = document.getElementById('status');
+    el.className = 'status ' + (d.tiktok_listener ? 'ok' : '');
+    el.textContent = `Provider: ${d.provider}\nTikTok listener: ${d.tiktok_listener ? 'RUNNING ✅' : 'stopped'}\nOverlay: ${d.overlay_url}`;
+  } catch(e) {
+    const el = document.getElementById('status');
+    el.className = 'status bad';
+    el.textContent = 'Control server is not responding.';
+  }
+}
+async function startTikTok(){
+  const username = document.getElementById('username').value.trim();
+  const r = await fetch('/control/tiktok/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username})});
+  const d = await r.json();
+  document.getElementById('status').textContent = d.message || d.error || JSON.stringify(d);
+  setTimeout(refreshStatus, 800);
+}
+async function stopTikTok(){
+  const r = await fetch('/control/tiktok/stop', {method:'POST'});
+  const d = await r.json();
+  document.getElementById('status').textContent = d.message || JSON.stringify(d);
+  setTimeout(refreshStatus, 500);
+}
+async function testPersona(persona, text){
+  const r = await fetch('/event', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({type:'comment', user:'Queen-Test', text:`!${persona} ${text}`})});
+  const d = await r.json();
+  document.getElementById('status').textContent = d.cue ? `${d.cue.persona || persona}: ${d.cue.text || JSON.stringify(d.cue)}` : 'Event accepted, but no cue fired.';
+}
+async function copyOverlay(){
+  await navigator.clipboard.writeText('http://127.0.0.1:8765/');
+  document.getElementById('status').textContent = 'Overlay URL copied.';
+}
+refreshStatus();
+setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>
