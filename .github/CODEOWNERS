@@ -10,3 +10,8 @@
 /SAFETY_CASE.md @mommommy1960-lang
 /CHANGE_CONTROL.md @mommommy1960-lang
 /.github/ @mommommy1960-lang
+# CODEOWNERS
+* @mommommy1960-lang
+.github/ @mommommy1960-lang
+docs/ @mommommy1960-lang
+tests/ @mommommy1960-lang
