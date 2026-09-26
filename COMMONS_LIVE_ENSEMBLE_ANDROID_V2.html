@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Commons Live Ensemble • Android</title>
+<meta name="theme-color" content="#0a0d12">
+<style>
+:root{--bg:#080b11;--panel:#101722;--line:#29364a;--gold:#e8c66d;--text:#f7f8fb;--muted:#9eabba;--good:#83e6a0;--bad:#ff8f9c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#070a0f,#0b1019 45%,#080b11);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:900px;margin:auto;padding:18px 14px 80px}h1{font-size:clamp(28px,7vw,48px);margin:6px 0 4px}.sub{color:var(--muted);margin-bottom:16px}.card{background:rgba(16,23,34,.96);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}input{background:#090e16;color:#fff;border:1px solid #39475b;border-radius:12px;padding:13px 14px;font-size:17px;min-height:48px;flex:1;min-width:190px}button{border:0;border-radius:13px;padding:13px 16px;font-size:16px;font-weight:800;min-height:48px;cursor:pointer}.primary{background:var(--gold);color:#101010}.secondary{background:#263348;color:#fff}.danger{background:#6f2732;color:#fff}.status{padding:12px;border-radius:12px;background:#090e16;margin-top:12px;white-space:pre-wrap}.ok{color:var(--good)}.bad{color:var(--bad)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.stat{background:#090e16;border-radius:12px;padding:10px;text-align:center}.stat b{display:block;font-size:23px}.cast{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.cast button{background:#1a2535;color:#fff;border:1px solid #33445c}.feed{max-height:320px;overflow:auto;background:#090e16;border-radius:12px;padding:8px}.item{padding:10px;border-bottom:1px solid #1c2837}.item:last-child{border-bottom:0}.who{font-weight:800;color:var(--gold)}.persona{margin-top:6px;color:#cdd9e8}small{color:var(--muted)}.toggle{display:flex;align-items:center;gap:8px}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#1c2837;color:#dce6f1;font-size:12px}footer{color:#7f8c9c;text-align:center;margin-top:18px;font-size:12px}
+</style>
+<script>
+window.__appJS = true;
+window.addEventListener('error', function(e){
+  var s=document.getElementById('status');
+  if(s){s.className='status bad';s.textContent='APP ERROR: '+(e.message||'unknown JavaScript error');}
+});
+</script>
+<script src="https://tiktok-chat-reader.zerody.one/socket.io/socket.io.js"></script>
+</head>
+<body>
+<main>
+<h1>👑 Commons Live Ensemble</h1>
+<div class="sub">Android LIVE co-host control room • v2</div>
+<section class="card">
+<div class="row">
+<input id="username" value="user2885077566" aria-label="TikTok username">
+<button id="start" class="primary">▶ START</button>
+<button id="stop" class="danger" style="display:none">■ STOP</button>
+</div>
+<div id="status" class="status">JavaScript is running ✅\nStart your TikTok LIVE, then tap START.</div>
+<div class="stats"><div class="stat"><b id="viewers">0</b><small>viewers</small></div><div class="stat"><b id="likes">0</b><small>likes</small></div><div class="stat"><b id="diamonds">0</b><small>diamonds</small></div></div>
+</section>
+<section class="card"><div class="row"><label class="toggle"><input id="voice" type="checkbox" checked> Speak replies</label><label class="toggle"><input id="auto" type="checkbox" checked> Auto-react</label><button class="secondary" id="wake">☀ Keep Screen Awake</button></div></section>
+<section class="card"><h3>Test the cast</h3><div class="cast"><button data-test="sage">🦉 Sage</button><button data-test="aurora">💎 Aurora</button><button data-test="maya">🧠 Maya</button><button data-test="serafina">🐍 Serafina</button></div><p><small>These four buttons must work even before TikTok connects.</small></p></section>
+<section class="card"><h3>Live feed</h3><div id="feed" class="feed"><div class="item">Waiting for LIVE events…</div></div></section>
+<footer>Prototype Android bridge. Presentation only. Never connect gifts/likes to animal feeding or enclosure controls.</footer>
+</main>
+<script>
+const BACKEND='https://tiktok-chat-reader.zerody.one/';let socket=null,uniqueId=null,connected=false,likeCount=0,diamondCount=0,lastLikeMilestone=0,wakeLock=null,startTimer=null;
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function setStatus(t,good=false,bad=false){const e=$('status');e.textContent=t;e.className='status'+(good?' ok':'')+(bad?' bad':'')}
+function addFeed(user,text,type='chat',personaText=''){const f=$('feed');if(f.children.length===1&&f.textContent.includes('Waiting'))f.innerHTML='';const d=document.createElement('div');d.className='item';d.innerHTML=`<span class="who">${esc(user||'viewer')}</span> <span class="badge">${esc(type)}</span><br>${esc(text)}${personaText?`<div class="persona">🎙️ ${esc(personaText)}</div>`:''}`;f.appendChild(d);while(f.children.length>80)f.removeChild(f.firstChild);f.scrollTop=f.scrollHeight}
+function speak(text){if(!$('voice').checked||!('speechSynthesis'in window))return;const u=new SpeechSynthesisUtterance(text);u.rate=1;u.pitch=1;u.volume=1;speechSynthesis.cancel();speechSynthesis.speak(u)}
+function pickPersona(t){t=String(t||'').trim().toLowerCase();if(t.startsWith('!aurora'))return'aurora';if(t.startsWith('!maya'))return'maya';if(t.startsWith('!serafina')||t.startsWith('!snake'))return'serafina';return'sage'}
+function stripCommand(t){return String(t||'').replace(/^!(sage|aurora|maya|serafina|snake)\s*/i,'').trim()}
+function response(p,u,t,type='chat',x={}){const q=stripCommand(t),l=q.toLowerCase(),n=u||'friend';if(type==='gift'){const g=x.giftName||'gift';if(/rose/i.test(g))return`${n}, welcome to the Lounge. That rose has officially been noticed.`;if(/heart/i.test(g))return`${n}, heart received. You get the next question.`;if(/crown/i.test(g))return`${n}, a crown? Very dramatic. Queen's Command is now yours.`;return`${n}, thank you for the ${g}. The whole room just noticed you.`}if(type==='follow')return`${n}, welcome in. You are officially part of tonight's suspicious little gathering.`;if(type==='share')return`${n}, thank you for sharing the LIVE. Recruitment has apparently begun.`;if(p==='aurora')return l.includes('status')?'Aurora online. Broadcast stable. Queen has the bridge. Audience channel is open.':`${n}, Aurora acknowledges you. Public channel only. The ship is listening.`;if(p==='maya')return l.includes('why')?`${n}, find the incentive, find the feedback loop, then find who carries the cost.`:`${n}, Maya here. I am treating that as a systems question.`;if(p==='serafina')return l.includes('doing')?`${n}, Her Majesty is conducting snake business. We are permitted to observe, not interrupt.`:`${n}, the Royal Serpent Court has heard you. Serafina remains magnificently unconcerned.`;if(l.includes('sing')||l.includes('voice'))return`${n}, Queen, apparently your voice has acquired a witness.`;if(l.includes('?'))return`${n}, that is a real question. Queen, I am putting that one on the table.`;return`${n}, Sage heard you. You said: ${q||'hello'}. Welcome to the show.`}
+function react(p,u,t,type='chat',x={}){if(!$('auto').checked)return'';const r=response(p,u,t,type,x);addFeed(u,t,type,`${p.toUpperCase()}: ${r}`);speak(r);return r}
+function uname(m){return m?.uniqueId||m?.nickname||m?.user?.uniqueId||m?.user?.nickname||'friend'}
+function bind(){socket.on('connect',()=>{setStatus('Bridge connected ✅\nNow asking TikTok for your LIVE room…',true);socket.emit('setUniqueId',uniqueId,{enableExtendedGiftInfo:true});});socket.on('connect_error',e=>{clearTimeout(startTimer);setStatus('BRIDGE CONNECTION FAILED\n'+(e?.message||e)+'\nUse Chrome, not Mi Browser.',false,true)});socket.on('tiktokConnected',()=>{clearTimeout(startTimer);connected=true;setStatus(`LIVE CONNECTED ✅\n@${uniqueId}`,true);$('start').style.display='none';$('stop').style.display=''});socket.on('tiktokDisconnected',e=>{clearTimeout(startTimer);connected=false;setStatus('TIKTOK DID NOT CONNECT\n'+(typeof e==='string'?e:JSON.stringify(e))+'\nMake sure you are currently LIVE and the username is your @username.',false,true);$('start').style.display='';$('stop').style.display='none'});socket.on('roomUser',m=>{if(typeof m.viewerCount==='number')$('viewers').textContent=m.viewerCount.toLocaleString()});socket.on('like',m=>{if(typeof m.totalLikeCount==='number'){likeCount=m.totalLikeCount;$('likes').textContent=likeCount.toLocaleString()}const milestone=Math.floor(likeCount/100)*100;if(milestone>=100&&milestone>lastLikeMilestone){lastLikeMilestone=milestone;const r=`Chat crossed ${milestone} likes. Queen, apparently the room has functioning thumbs.`;addFeed('ROOM',`${milestone} likes`,'likes',`SAGE: ${r}`);speak(r)}});socket.on('chat',m=>react(pickPersona(m.comment),uname(m),m.comment||'','chat'));socket.on('gift',d=>{if(d.giftType===1&&!d.repeatEnd)return;const c=(Number(d.diamondCount)||0)*(Number(d.repeatCount)||1);diamondCount+=Math.max(0,c);$('diamonds').textContent=diamondCount.toLocaleString();react('sage',uname(d),`${d.giftName||'Gift'} x${d.repeatCount||1}`,'gift',{giftName:d.giftName})});socket.on('follow',d=>react('sage',uname(d),'followed','follow'));socket.on('share',d=>react('sage',uname(d),'shared the LIVE','share'))}
+function start(){uniqueId=$('username').value.trim().replace(/^@/,'');if(!uniqueId){setStatus('Enter your TikTok @username.',false,true);return}localStorage.setItem('commonsLiveUser',uniqueId);if(typeof io!=='function'){setStatus('THE LIVE BRIDGE SCRIPT DID NOT LOAD.\nThis browser blocked it. Open this same page in Google Chrome.',false,true);return}try{if(socket)socket.disconnect();setStatus('Starting…');socket=io(BACKEND,{transports:['websocket','polling'],timeout:12000,reconnection:false});bind();startTimer=setTimeout(()=>{if(!connected)setStatus('STILL NOT CONNECTED AFTER 15 SECONDS.\nThis is the bridge, not you. Try Google Chrome. If the four character test buttons work, the app itself is fine.',false,true)},15000)}catch(e){setStatus('Could not start: '+e.message,false,true)}}
+function stop(){clearTimeout(startTimer);try{if(socket){socket.emit('disconnect_tiktok');socket.disconnect()}}catch(e){}connected=false;$('start').style.display='';$('stop').style.display='none';setStatus('Stopped.')}
+$('start').onclick=start;$('stop').onclick=stop;document.querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>{const p=b.dataset.test;const t={sage:'Welcome everybody to the show.',aurora:'status report',maya:'why do systems fail?',serafina:'what is the snake doing?'}[p];const r=react(p,'Queen-Test',`!${p} ${t}`,'test');setStatus(`${p.toUpperCase()} TEST WORKED ✅\n${r}`,true)});$('wake').onclick=async()=>{try{if(!('wakeLock'in navigator)){setStatus('This browser does not support screen wake lock.');return}wakeLock=await navigator.wakeLock.request('screen');$('wake').textContent='☀ Screen Will Stay Awake'}catch(e){setStatus('Wake lock could not start: '+e.message,false,true)}};const saved=localStorage.getItem('commonsLiveUser');if(saved)$('username').value=saved;
+</script>
+</body>
+</html>

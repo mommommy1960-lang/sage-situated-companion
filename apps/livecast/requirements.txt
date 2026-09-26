@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+# Experimental direct TikTok LIVE event reader. This is an unofficial third-party client
+# and should remain isolated/replaceable for commercial use.
+TikTokLive
