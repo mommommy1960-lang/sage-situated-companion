@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Commons Live Ensemble • Android</title>
+<meta name="theme-color" content="#0a0d12">
+<style>
+:root{
+  --bg:#080b11; --panel:#101722; --line:#29364a; --gold:#e8c66d;
+  --text:#f7f8fb; --muted:#9eabba; --good:#83e6a0; --bad:#ff8f9c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#070a0f,#0b1019 45%,#080b11);
+color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:900px;margin:auto;padding:18px 14px 80px}
+h1{font-size:clamp(28px,7vw,48px);margin:6px 0 4px}
+.sub{color:var(--muted);margin-bottom:16px}
+.card{background:rgba(16,23,34,.96);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select{background:#090e16;color:#fff;border:1px solid #39475b;border-radius:12px;padding:13px 14px;font-size:17px;min-height:48px}
+input{flex:1;min-width:190px}
+button{border:0;border-radius:13px;padding:13px 16px;font-size:16px;font-weight:800;min-height:48px;cursor:pointer}
+.primary{background:var(--gold);color:#101010}
+.secondary{background:#263348;color:#fff}
+.danger{background:#6f2732;color:#fff}
+.status{padding:12px;border-radius:12px;background:#090e16;margin-top:12px;white-space:pre-wrap}
+.ok{color:var(--good)} .bad{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{background:#090e16;border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:23px}
+.cast{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.cast button{background:#1a2535;color:#fff;border:1px solid #33445c}
+.feed{max-height:320px;overflow:auto;background:#090e16;border-radius:12px;padding:8px}
+.item{padding:10px;border-bottom:1px solid #1c2837}
+.item:last-child{border-bottom:0}
+.who{font-weight:800;color:var(--gold)}
+.persona{margin-top:6px;color:#cdd9e8}
+small{color:var(--muted)}
+.toggle{display:flex;align-items:center;gap:8px}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#1c2837;color:#dce6f1;font-size:12px}
+.gift{color:#ffcf70}
+footer{color:#7f8c9c;text-align:center;margin-top:18px;font-size:12px}
+</style>
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+</head>
+<body>
+<main>
+  <h1>👑 Commons Live Ensemble</h1>
+  <div class="sub">Android LIVE co-host control room</div>
+
+  <section class="card">
+    <div class="row">
+      <input id="username" value="user2885077566" aria-label="TikTok username">
+      <button id="start" class="primary">▶ START</button>
+      <button id="stop" class="danger" style="display:none">■ STOP</button>
+    </div>
+    <div id="status" class="status">Ready. Start your TikTok LIVE, then tap START here.</div>
+    <div class="stats">
+      <div class="stat"><b id="viewers">0</b><small>viewers</small></div>
+      <div class="stat"><b id="likes">0</b><small>likes</small></div>
+      <div class="stat"><b id="diamonds">0</b><small>diamonds</small></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <label class="toggle"><input id="voice" type="checkbox" checked style="min-width:auto;flex:0"> Speak replies</label>
+      <label class="toggle"><input id="auto" type="checkbox" checked style="min-width:auto;flex:0"> Auto-react</label>
+      <button class="secondary" id="wake">☀ Keep Screen Awake</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Test the cast</h3>
+    <div class="cast">
+      <button data-test="sage">🦉 Sage</button>
+      <button data-test="aurora">💎 Aurora</button>
+      <button data-test="maya">🧠 Maya</button>
+      <button data-test="serafina">🐍 Serafina</button>
+    </div>
+    <p><small>Viewers can type <b>!sage</b>, <b>!aurora</b>, <b>!maya</b>, or <b>!serafina</b>.</small></p>
+  </section>
+
+  <section class="card">
+    <h3>Live feed</h3>
+    <div id="feed" class="feed"><div class="item">Waiting for LIVE events…</div></div>
+  </section>
+
+  <footer>
+    Prototype Android bridge. Presentation only. Never connect gifts/likes to animal feeding or enclosure controls.
+  </footer>
+</main>
+
+<script>
+const BACKEND = "https://tiktok-chat-reader.zerody.one/";
+let socket = null, uniqueId = null, connected = false;
+let likeCount = 0, diamondCount = 0, viewerCount = 0, lastLikeMilestone = 0;
+let wakeLock = null;
+
+const $ = id => document.getElementById(id);
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function setStatus(text, good=false, bad=false){
+  const el=$('status'); el.textContent=text; el.className='status'+(good?' ok':'')+(bad?' bad':'');
+}
+function addFeed(user, text, type='chat', personaText=''){
+  const f=$('feed');
+  if(f.children.length===1 && f.textContent.includes('Waiting')) f.innerHTML='';
+  const d=document.createElement('div'); d.className='item';
+  d.innerHTML=`<span class="who">${escapeHtml(user||'viewer')}</span> <span class="badge">${escapeHtml(type)}</span><br>${escapeHtml(text)}${personaText?`<div class="persona">🎙️ ${escapeHtml(personaText)}</div>`:''}`;
+  f.appendChild(d);
+  while(f.children.length>80) f.removeChild(f.firstChild);
+  f.scrollTop=f.scrollHeight;
+}
+function speak(text){
+  if(!$('voice').checked || !('speechSynthesis' in window)) return;
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=1.0; u.pitch=1.0; u.volume=1;
+  speechSynthesis.speak(u);
+}
+function usernameOf(m){ return m?.uniqueId || m?.nickname || m?.user?.uniqueId || m?.user?.nickname || 'friend'; }
+
+function pickPersona(text){
+  const t=String(text||'').trim().toLowerCase();
+  if(t.startsWith('!aurora')) return 'aurora';
+  if(t.startsWith('!maya')) return 'maya';
+  if(t.startsWith('!serafina') || t.startsWith('!snake')) return 'serafina';
+  if(t.startsWith('!sage')) return 'sage';
+  return 'sage';
+}
+function stripCommand(text){
+  return String(text||'').replace(/^!(sage|aurora|maya|serafina|snake)\s*/i,'').trim();
+}
+
+function response(persona,user,text,eventType='chat',extra={}){
+  const q=stripCommand(text);
+  const lower=q.toLowerCase();
+  const name=user||'friend';
+
+  if(eventType==='gift'){
+    const g=extra.giftName||'gift';
+    if(/rose/i.test(g)) return `${name}, welcome to the Lounge. That rose has officially been noticed.`;
+    if(/heart/i.test(g)) return `${name}, heart received. You get the next question.`;
+    if(/crown/i.test(g)) return `${name}, a crown? Very dramatic. Queen's Command is now yours.`;
+    return `${name}, thank you for the ${g}. The whole room just noticed you.`;
+  }
+  if(eventType==='follow') return `${name}, welcome in. You are officially part of tonight's suspicious little gathering.`;
+  if(eventType==='share') return `${name}, thank you for sharing the LIVE. Recruitment has apparently begun.`;
+
+  if(persona==='aurora'){
+    if(lower.includes('status')) return `Aurora online. Broadcast stable. Queen has the bridge. Audience channel is open.`;
+    return `${name}, Aurora acknowledges you. Public channel only. The ship is listening.`;
+  }
+  if(persona==='maya'){
+    if(lower.includes('why')) return `${name}, my systems answer is this: find the incentive, find the feedback loop, then find who carries the cost.`;
+    return `${name}, Maya here. I am treating that as a systems question, not just a surface question.`;
+  }
+  if(persona==='serafina'){
+    if(lower.includes('where') || lower.includes('doing')) return `${name}, Her Majesty is conducting snake business. We are permitted to observe, not interrupt.`;
+    return `${name}, the Royal Serpent Court has heard you. Serafina remains magnificently unconcerned.`;
+  }
+  if(lower.includes('sing') || lower.includes('voice')) return `${name}, I heard that. Queen, apparently your voice has acquired a witness.`;
+  if(lower.includes('love')) return `${name}, affection detected. Humans remain alarmingly sentimental, but we accept.`;
+  if(lower.includes('where')) return `${name}, excellent question. Queen, they want coordinates, context, or possibly gossip.`;
+  if(lower.includes('?')) return `${name}, that is a real question. Queen, I am putting that one on the table.`;
+  return `${name}, Sage heard you. You said: ${q || 'hello'}. Welcome to the show.`;
+}
+function react(persona,user,text,type='chat',extra={}){
+  if(!$('auto').checked) return '';
+  const r=response(persona,user,text,type,extra);
+  addFeed(user,text,type,`${persona.toUpperCase()}: ${r}`);
+  speak(r); return r;
+}
+
+function bindSocket(){
+  socket.on('connect', ()=> {
+    setStatus('Bridge connected. Connecting to your TikTok LIVE…');
+    if(uniqueId) socket.emit('setUniqueId', uniqueId, {});
+  });
+  socket.on('tiktokConnected', state=>{
+    connected=true;
+    setStatus(`LIVE CONNECTED ✅\n@${uniqueId}`,true);
+    $('start').style.display='none'; $('stop').style.display='';
+  });
+  socket.on('tiktokDisconnected', err=>{
+    connected=false;
+    setStatus(`TikTok listener disconnected: ${err || 'unknown reason'}`,false,true);
+    $('start').style.display=''; $('stop').style.display='none';
+  });
+  socket.on('streamEnd', ()=>setStatus('LIVE ended.',false,false));
+  socket.on('roomUser', msg=>{
+    if(typeof msg.viewerCount==='number'){ viewerCount=msg.viewerCount; $('viewers').textContent=viewerCount.toLocaleString(); }
+  });
+  socket.on('like', msg=>{
+    if(typeof msg.totalLikeCount==='number'){ likeCount=msg.totalLikeCount; $('likes').textContent=likeCount.toLocaleString(); }
+    const milestone=Math.floor(likeCount/100)*100;
+    if(milestone>=100 && milestone>lastLikeMilestone){
+      lastLikeMilestone=milestone;
+      const r=`Chat just crossed ${milestone} likes. Queen, apparently the room has functioning thumbs.`;
+      addFeed('ROOM',`${milestone} likes`,'like milestone',`SAGE: ${r}`); speak(r);
+    }
+  });
+  socket.on('chat', msg=>{
+    const user=usernameOf(msg), text=msg.comment||'';
+    const persona=pickPersona(text);
+    react(persona,user,text,'chat');
+  });
+  socket.on('gift', data=>{
+    if(data.giftType===1 && !data.repeatEnd) return;
+    const user=usernameOf(data);
+    const cost=(Number(data.diamondCount)||0)*(Number(data.repeatCount)||1);
+    diamondCount+=Math.max(0,cost); $('diamonds').textContent=diamondCount.toLocaleString();
+    react('sage',user,`${data.giftName||'Gift'} x${data.repeatCount||1}`,'gift',{giftName:data.giftName});
+  });
+  socket.on('follow', data=>react('sage',usernameOf(data),'followed','follow'));
+  socket.on('share', data=>react('sage',usernameOf(data),'shared the LIVE','share'));
+}
+
+function start(){
+  uniqueId=$('username').value.trim().replace(/^@/,'');
+  if(!uniqueId){ setStatus('Enter your TikTok username.',false,true); return; }
+  localStorage.setItem('commonsLiveUser',uniqueId);
+  try{
+    if(socket) socket.disconnect();
+    socket=io(BACKEND,{transports:['websocket','polling']});
+    bindSocket();
+    setStatus('Starting…');
+  }catch(e){ setStatus(`Could not start: ${e.message}`,false,true); }
+}
+function stop(){
+  try{
+    if(socket){ socket.emit('disconnect_tiktok'); socket.disconnect(); }
+  }catch(e){}
+  connected=false; $('start').style.display=''; $('stop').style.display='none';
+  setStatus('Stopped.');
+}
+$('start').onclick=start;
+$('stop').onclick=stop;
+
+document.querySelectorAll('[data-test]').forEach(b=>{
+  b.onclick=()=>{
+    const p=b.dataset.test;
+    const test={sage:'Welcome everybody to the show.',aurora:'status report',maya:'why do systems fail?',serafina:'what is the snake doing?'}[p];
+    react(p,'Queen-Test',`!${p} ${test}`,'chat');
+  };
+});
+$('wake').onclick=async()=>{
+  try{
+    if(!('wakeLock' in navigator)){ setStatus('This browser does not support screen wake lock.'); return; }
+    wakeLock=await navigator.wakeLock.request('screen');
+    $('wake').textContent='☀ Screen Will Stay Awake';
+  }catch(e){ setStatus(`Wake lock could not start: ${e.message}`,false,true); }
+};
+
+const saved=localStorage.getItem('commonsLiveUser'); if(saved) $('username').value=saved;
+
+document.body.addEventListener('click',()=>{
+  if('speechSynthesis' in window && speechSynthesis.paused) speechSynthesis.resume();
+},{once:true});
+</script>
+</body>
+</html>
