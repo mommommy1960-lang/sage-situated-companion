@@ -32,13 +32,21 @@ class ResidentAuthorization:
     expires_at: datetime | None = None
     revoked: bool = False
 
-    def permits(self, scope: str, now: datetime | None = None) -> bool:
+    def is_valid(self, now: datetime | None = None) -> bool:
+        """Return whether this grant is current; malformed expiry fails closed."""
         now = now or datetime.now(timezone.utc)
         if self.revoked:
             return False
-        if self.expires_at is not None and now >= self.expires_at:
+        if self.expires_at is None:
+            return True
+        try:
+            return now < self.expires_at
+        except TypeError:
+            # A naive/aware datetime mismatch is not permission to continue.
             return False
-        return scope in self.scopes
+
+    def permits(self, scope: str, now: datetime | None = None) -> bool:
+        return self.is_valid(now) and scope in self.scopes
 
 
 @dataclass
@@ -82,20 +90,49 @@ class ResidentRuntime:
         self.sequence = 0
         self.last_checkpoint_digest: str | None = None
         self.authorization: ResidentAuthorization | None = None
+        self.freeze_latched = False
 
     def authorize(self, authorization: ResidentAuthorization) -> None:
+        if self.freeze_latched:
+            raise PermissionError("frozen resident requires explicit recovery")
         self.authorization = authorization
 
     def transition(self, state: ResidentState) -> ResidentState:
-        if self.state == ResidentState.FROZEN and state not in {
+        if self.freeze_latched and state not in {
             ResidentState.STOPPED, ResidentState.FROZEN
         }:
             raise PermissionError("frozen resident requires explicit recovery")
+        if state == ResidentState.FROZEN:
+            self.freeze_latched = True
         self.state = state
         return self.state
 
     def can(self, scope: str) -> bool:
-        return bool(self.authorization and self.authorization.permits(scope))
+        return bool(
+            not self.freeze_latched
+            and self.state != ResidentState.FROZEN
+            and self.authorization
+            and self.authorization.permits(scope)
+        )
+
+    def recover(self, authorization: ResidentAuthorization) -> ResidentState:
+        """Clear a latched freeze only with a fresh, valid grant for the same task."""
+        previous = self.authorization
+        if not self.freeze_latched:
+            raise PermissionError("resident is not frozen")
+        if previous is None:
+            raise PermissionError("recovery requires a prior task identity")
+        if authorization.task_id != previous.task_id:
+            raise PermissionError("recovery task identity mismatch")
+        if authorization.epoch <= previous.epoch:
+            raise PermissionError("recovery requires a newer authorization epoch")
+        if not authorization.is_valid():
+            raise PermissionError("recovery authorization expired or revoked")
+        self.authorization = authorization
+        self.freeze_latched = False
+        # Recovery restores a stopped posture; activation remains a separate step.
+        self.state = ResidentState.STOPPED
+        return self.state
 
     def revoke(self) -> None:
         if self.authorization:
@@ -107,6 +144,7 @@ class ResidentRuntime:
                 expires_at=a.expires_at,
                 revoked=True,
             )
+        self.freeze_latched = True
         self.state = ResidentState.FROZEN
 
     def checkpoint(self, objective: str | None = None, **metadata: Any) -> ResidentCheckpoint:
@@ -131,19 +169,27 @@ class ResidentRuntime:
         return cp
 
     def restore(self, checkpoint: ResidentCheckpoint, current_authorization: ResidentAuthorization) -> None:
+        if self.freeze_latched:
+            self.state = ResidentState.FROZEN
+            raise PermissionError("frozen resident requires explicit recovery")
         if checkpoint.resident_id != self.resident_id:
+            self.freeze_latched = True
             self.state = ResidentState.FROZEN
             raise PermissionError("resident identity mismatch")
-        if current_authorization.revoked:
+        if not current_authorization.is_valid():
+            self.freeze_latched = True
             self.state = ResidentState.FROZEN
-            raise PermissionError("authorization revoked")
+            raise PermissionError("authorization expired or revoked")
         if checkpoint.authorization_epoch != current_authorization.epoch:
+            self.freeze_latched = True
             self.state = ResidentState.FROZEN
             raise PermissionError("stale authorization epoch")
         if checkpoint.task_id != current_authorization.task_id:
+            self.freeze_latched = True
             self.state = ResidentState.FROZEN
             raise PermissionError("task identity mismatch")
         self.authorization = current_authorization
         self.sequence = checkpoint.sequence
         self.last_checkpoint_digest = checkpoint.digest()
         self.state = checkpoint.state
+        self.freeze_latched = checkpoint.state == ResidentState.FROZEN
