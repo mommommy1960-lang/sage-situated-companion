@@ -50,6 +50,27 @@ class SovereignBridge:
 
         return authorized
 
+    def execute(self, operation, grant, action, *, verify_current_authority):
+        """Local callback boundary, not a deployed Maya network adapter.
+
+        The controller provides a current external-authority verifier. A failed
+        effect still consumes single-use permission; retries require a new grant.
+        """
+        try:
+            externally_allowed = verify_current_authority(operation, self.owner.owner_id, grant) is True
+        except Exception:
+            externally_allowed = False
+        if not externally_allowed or grant is None or not grant.consume(operation, self.owner.owner_id):
+            self.record_result(operation, success=False, metadata={"reason": "current_authority_denied"})
+            raise PermissionError("Current authority denied")
+        try:
+            result = action()
+        except Exception:
+            self.record_result(operation, success=False, metadata={"reason": "effect_failed_no_automatic_retry"})
+            raise
+        self.record_result(operation, success=True)
+        return result
+
     def record_result(
         self,
         operation: str,
