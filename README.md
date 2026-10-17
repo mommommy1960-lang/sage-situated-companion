@@ -1,4 +1,17 @@
 # sage-situated-companion
+
+## Local authority boundary — October 17, 2026
+
+The basic `CapabilityGrant` now expires after five minutes by default, rejects
+future/not-yet-active authority and supports atomic single-operation consumption.
+`SovereignBridge.execute` requires a trusted current-authority callback and consumes
+single-use permission before attempting the effect. A failed effect does not grant
+an automatic retry. Session grants recheck owner, operation, expiry and revocation.
+`authorize` remains a preflight check and does not itself consume a grant.
+
+This is local, single-process enforcement, not a live Maya network adapter. Grant
+state is not durably persisted across restarts and caller-supplied metadata does
+not establish authority. Hardware and external effects remain separate work.
 Persistent situated AI companion architecture for real-time multimodal perception, contextual continuity, proactive intervention, personalized memory, and hardware-integrated human-AI interaction.
 
 ## Non-confidential Phase 1 feasibility review
