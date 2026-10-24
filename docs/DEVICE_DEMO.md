@@ -1,0 +1,34 @@
+# Sage device interface demonstration
+
+The browser interface in apps/tablet_web is part of the original Sage repository.
+It implements opt-in local camera preview, single-phrase browser speech recognition,
+local geolocation display and browser spoken playback. Text questions can go to
+1Queen/Sage-Agent-Course after separate cloud-text approval. The browser path calls
+that model directly; it does not yet run the Python SageRuntime, durable memory or
+Maya authority bridge. Do not conflate these paths.
+
+All controls start off. Stop stops camera tracks, aborts speech recognition,
+clears the location watch (including watch ID zero), cancels speech playback,
+invalidates in-flight model output, clears input/output and resets sharing consent.
+A permission dialog completing after Stop cannot restart the camera. The page
+stops all features when hidden or left. Device APIs require supported browsers,
+OS grants and appropriate secure-context/Permissions-Policy settings.
+
+Camera frames and coordinates are never sent to the model. Browser speech
+recognition may send audio to its speech service; approval is separate. No raw
+recording, persistent browser storage, analytics or automatic message sending is
+implemented. CDN and font requests are ordinary external asset requests.
+
+Camera preview is not image interpretation; location display is not navigation.
+The interface is foreground-only and has no guaranteed background listening,
+hazard detection, emergency response or hardware control. Test stationary with
+public phrases. Do not rely on the prototype while riding.
+
+Run `node --test tests/device/controller.test.mjs` for lifecycle tests.
+Run `python -m pytest tests -q` for the existing Python suite.
+
+Next developer integration: replace the direct text connection with a deployed,
+authenticated application adapter around CompanionSession and SageRuntime; add
+approved-source retrieval; define sensory data scopes/retention; integrate an
+image-capable model only after explicit image disclosure controls; validate real
+Android devices, latency, denial paths, revoke behavior and battery usage.
