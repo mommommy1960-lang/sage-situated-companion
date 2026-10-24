@@ -9,9 +9,10 @@ from interfaces.contracts import GenerationAdapter
 
 
 class HuggingFaceGenerationAdapter(GenerationAdapter):
-    def __init__(self, *, client=None, space="1Queen/Sage-Agent-Course"):
+    def __init__(self, *, client=None, space="1Queen/Sage-Agent-Course", timeout=90):
         self.space = space
         self._client = client
+        self.timeout = timeout
 
     @property
     def client(self):
@@ -41,7 +42,12 @@ class HuggingFaceGenerationAdapter(GenerationAdapter):
         )
         if len(prompt) > 4000:
             raise ValueError("Question exceeds the Space's 4,000-character input limit")
-        result = self.client.predict(prompt, api_name="/ask_sage")
+        job = self.client.submit(prompt, api_name="/ask_sage")
+        try:
+            result = job.result(timeout=self.timeout)
+        except TimeoutError:
+            job.cancel()
+            raise TimeoutError("Sage response timed out; no automatic retry") from None
         if not isinstance(result, str) or not result.strip():
             raise RuntimeError("Sage Space returned no usable text")
         return result.strip()
