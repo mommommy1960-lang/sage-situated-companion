@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {askText} from '../../apps/tablet_web/model-client.mjs';
+function fetcher(frames,calls=[]){return async(url,options)=>{calls.push({url,options});return calls.length===1?{ok:true,json:async()=>({event_id:'abc'})}:{ok:true,body:new ReadableStream({start(c){for(const f of frames)c.enqueue(new TextEncoder().encode(f));c.close();}})};};}
+test('parses fragmented SSE and sends text only',async()=>{const calls=[];assert.equal(await askText('Hi',{fetcher:fetcher(['event: heartbeat\ndata: null\n\nevent: comp','lete\ndata: ["Hello"]\n\n'],calls)}),'Hello');const body=JSON.parse(calls[0].options.body);assert.deepEqual(Object.keys(body),['data']);assert.equal(body.data.length,1);assert.ok(body.data[0].includes('Hi'));});
+test('model errors do not become answers',async()=>{await assert.rejects(askText('Hi',{fetcher:fetcher(['event: error\ndata: null\n\n'])}));});
+test('missing completion rejected',async()=>{await assert.rejects(askText('Hi',{fetcher:fetcher(['event: heartbeat\ndata: null\n\n'])}));});
+test('empty completion rejected',async()=>{await assert.rejects(askText('Hi',{fetcher:fetcher(['event: complete\ndata: [""]\n\n'])}));});

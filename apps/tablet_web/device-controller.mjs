@@ -1,0 +1,14 @@
+// Device lifecycle boundary. No device starts on page load.
+export class DeviceController {
+ constructor(env, change=()=>{}) {this.env=env;this.change=change;this.active=false;this.epoch=0;this.seq={camera:0,mic:0,location:0};this.stream=null;this.recognition=null;this.watch=null;this.location=null;this.transcript='';}
+ start(){this.active=true;this.epoch++;this.change();}
+ require(){if(!this.active)throw new Error('Start Sage first.');}
+ async camera(){this.require();this.stopCamera();const epoch=this.epoch,seq=++this.seq.camera;const s=await this.env.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});if(!this.active||epoch!==this.epoch||seq!==this.seq.camera){s.getTracks().forEach(t=>t.stop());return null;}this.stream=s;this.change();return s;}
+ stopCamera(){this.seq.camera++;this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;this.change();}
+ listen(){this.require();this.stopMic();if(!this.env.Recognition)throw new Error('Voice input is unavailable in this browser. Type your message instead.');const r=new this.env.Recognition();const epoch=this.epoch,seq=++this.seq.mic;this.recognition=r;r.lang='en-US';r.continuous=false;r.interimResults=false;r.onresult=e=>{if(this.active&&epoch===this.epoch&&seq===this.seq.mic){this.transcript=e.results[0][0].transcript;this.change();}};r.onend=()=>{if(this.recognition===r){this.recognition=null;this.change();}};r.onerror=()=>{if(this.recognition===r){this.recognition=null;this.change('Voice input ended. You can type instead.');}};r.start();this.change();}
+ stopMic(){this.seq.mic++;const r=this.recognition;this.recognition=null;if(r){r.onresult=null;r.onend=null;r.onerror=null;try{r.abort();}catch{}}this.change();}
+ locate(){this.require();this.stopLocation();if(!this.env.geolocation)throw new Error('Location is unavailable in this browser.');const epoch=this.epoch,seq=++this.seq.location;this.watch=this.env.geolocation.watchPosition(p=>{if(this.active&&epoch===this.epoch&&seq===this.seq.location){this.location={latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy,timestamp:p.timestamp};this.change();}},()=>{if(this.active&&epoch===this.epoch&&seq===this.seq.location){this.stopLocation();this.change('Location permission denied or unavailable.');}},{enableHighAccuracy:false,maximumAge:0,timeout:15000});this.change();}
+ stopLocation(){this.seq.location++;if(this.watch!==null)this.env.geolocation?.clearWatch(this.watch);this.watch=null;this.location=null;this.change();}
+ speak(text){this.require();if(!this.env.speech||!this.env.Utterance)throw new Error('Spoken responses are unavailable.');this.env.speech.cancel();this.env.speech.speak(new this.env.Utterance(text));}
+ stop(){this.active=false;this.epoch++;this.stopCamera();this.stopMic();this.stopLocation();this.env.speech?.cancel();this.transcript='';this.change();}
+}
