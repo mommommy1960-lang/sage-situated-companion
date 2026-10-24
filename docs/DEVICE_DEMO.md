@@ -10,8 +10,9 @@ Maya authority bridge. Do not conflate these paths.
 All controls start off. Stop stops camera tracks, aborts speech recognition,
 clears the location watch (including watch ID zero), cancels speech playback,
 invalidates in-flight model output, clears input/output and resets sharing consent.
-A permission dialog completing after Stop cannot restart the camera. The page
-stops all features when hidden or left. Device APIs require supported browsers,
+A permission dialog completing after Stop cannot restart the camera. Ordinary tab switches keep the session, approvals, question, answer and pending
+model request. Actual navigation or closing releases device streams. Explicit Stop
+still clears consent. Browser/OS background suspension may interrupt device access. Device APIs require supported browsers,
 OS grants and appropriate secure-context/Permissions-Policy settings.
 
 Camera frames and coordinates are never sent to the model. Browser speech
@@ -20,11 +21,17 @@ recording, persistent browser storage, analytics or automatic message sending is
 implemented. CDN and font requests are ordinary external asset requests.
 
 Camera preview is not image interpretation; location display is not navigation.
-The interface is foreground-only and has no guaranteed background listening,
+The browser may suspend a background tab; there is no guaranteed background listening,
 hazard detection, emergency response or hardware control. Test stationary with
 public phrases. Do not rely on the prototype while riding.
 
-Run `node --test tests/device/controller.test.mjs` for lifecycle tests.
+Run `node --test tests/device/*.test.mjs` for device lifecycle, speech diagnostics,
+stream parsing and tab-switch regression tests.
+
+The public demo is https://sage-companion-device-lab.myqueen1960.chatgpt.site/ .
+Test Sage's voice independently before asking a question. Speech events and errors
+are displayed; they do not independently prove the user heard audio. See
+[Sage tablet observations](SAGE_TABLET_TEST_2026-10-24.md).
 Run `python -m pytest tests -q` for the existing Python suite.
 
 Next developer integration: replace the direct text connection with a deployed,
