@@ -1,0 +1,7 @@
+# Sage restart and browser test — October 24, 2026
+
+Site source 5405bbd7142a57fdffd210248dacc5e514d0c53c adds opt-in remembered choices in localStorage. Choices apply only after pressing Start Sage following reload; device streams still require their own start controls. Stop clears saved choices, so revocation does not silently restore. Page copy now acknowledges that browser reloads can turn Sage off rather than promising uninterrupted operation. Previous answer remains recoverable while a new question is pending or fails.
+
+Verified through actual webpage, not only direct API: submitted public fictional bicycle name Comet, received acknowledgment, reloaded, restored chosen cloud/context settings with Start Sage, asked 'What is my bicycle called?', received 'Your bicycle is called Comet.' Devices remained off. Storage/memory, tab/Stop, speech, image inference and observation-loop checks pass. Earlier memory saved/deleted in browser and direct service recalled fictional café Cedar Cup. Image model described test cats image.
+
+Remaining: real tablet vision speed and audible observations, background operation, cross-device memory, grounded organization-answer reliability, full visual question answering, live map/web lookup and proactive place suggestions, motion understanding. This checkpoint does not claim the full companion is complete or intermittent tablet connection failure permanently resolved.
