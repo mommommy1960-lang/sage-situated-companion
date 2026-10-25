@@ -10,5 +10,5 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Test device lifecycle and model stream parsing
-        run: node --test tests/device/*.test.mjs
+      - name: Test device lifecycle, model parsing and business controls
+        run: node --test tests/device/*.test.mjs tests/business/*.test.mjs
