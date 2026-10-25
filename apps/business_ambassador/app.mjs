@@ -28,3 +28,38 @@ $('pilot-download').onclick=()=>download('Sage_Pilot_Discussion_Brief.txt',`SAGE
 addEventListener('pagehide',()=>stop('Session ended on navigation.'));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&session.active)stop('Session paused while this page was hidden. Start again to continue.');});
 suggestions();
+
+// Owner input is rendered only as text or form values. No network writes.
+import {validateProfile,profileInput,saveProfile,loadProfile,clearProfile,addEvaluation,DISCLOSURE} from './pilot.mjs';
+const faqInputs=[];
+for(let i=0;i<5;i++){
+ const group=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=`FAQ ${i+1}`;group.append(legend);
+ const fields={};
+ for(const [key,title,max,multiline] of [['question','Approved question',180,false],['answer','Approved answer',700,true],['sourceLabel','Source label (document / approval reference)',100,false]]){
+  const label=document.createElement('label'),input=document.createElement(multiline?'textarea':'input');label.textContent=`${title} (${max} characters)`;input.maxLength=max;input.id=`owner-${i}-${key}`;label.htmlFor=input.id;label.append(input);group.append(label);fields[key]=input;
+ }
+ faqInputs.push(fields);$('faq-fields').append(group);
+}
+function readOwner(){return {name:$('owner-name').value,faqs:faqInputs.map(fields=>Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,input.value]))).filter(f=>Object.values(f).some(v=>v.trim()))};}
+function fillOwner(profile){const raw=profileInput(profile);$('owner-name').value=raw.name;faqInputs.forEach((fields,i)=>{for(const key of Object.keys(fields))fields[key].value=raw.faqs[i]?.[key]||'';});}
+function installOwner(profile){
+ stop('Owner FAQ applied. Session and pending draft cleared. Start to test this profile.');
+ const index=profiles.findIndex(p=>p.id==='owner');if(index<0)profiles.push(profile);else profiles[index]=profile;
+ if(!$('profile').querySelector('option[value="owner"]')){const option=document.createElement('option');option.value='owner';option.textContent='Your owner FAQ · unverified';$('profile').append(option);}
+ session.select('owner');$('profile').value='owner';$('presence-note').textContent=profile.intro;suggestions();
+}
+$('owner-form').onsubmit=e=>{e.preventDefault();try{installOwner(validateProfile(readOwner()));$('owner-status').textContent='Applied in tab memory. Any previously saved device copy is unchanged until you explicitly save or delete it.';}catch(e){$('owner-status').textContent=e.message;}};
+$('save-owner').onclick=()=>{try{const profile=saveProfile(localStorage,readOwner());installOwner(profile);$('owner-status').textContent='Saved on this device and applied. This copy returns on reload. Clear / delete removes it.';}catch(e){$('owner-status').textContent=`Could not save: ${e.message}`;}};
+$('delete-owner').onclick=()=>{
+ let removed=true;try{clearProfile(localStorage);}catch{removed=false;}
+ if(session.profile.id==='owner'){stop();session.select(profiles[0].id);$('profile').value=profiles[0].id;$('presence-note').textContent=session.profile.intro;}
+ const index=profiles.findIndex(p=>p.id==='owner');if(index>=0)profiles.splice(index,1);
+ $('profile').querySelector('option[value="owner"]')?.remove();$('owner-form').reset();suggestions();
+ $('owner-status').textContent=removed?'Owner fields, active owner profile and saved device copy cleared. Exported files are unaffected.':'Tab profile cleared. Browser storage is unavailable; the saved device copy could not be deleted. Clear this site’s storage in browser settings.';
+};
+try{const saved=loadProfile(localStorage);if(saved){fillOwner(saved);installOwner(saved);$('owner-status').textContent='Loaded the explicitly saved device copy. Review facts before starting.';}}catch(e){$('owner-status').textContent=`Saved profile was not loaded: ${e.message}`;}
+let evaluations=[];
+function renderScores(){const correct=evaluations.filter(r=>r.result==='correct').length;const minutes=evaluations.reduce((n,r)=>n+r.staffMinutesEstimate,0);$('score-summary').textContent=`${evaluations.length} manual tests · ${correct} correct · ${evaluations.length-correct} needs review · ${minutes.toFixed(1)} estimated staff minutes spent. User-entered, unverified.`;$('score-rows').replaceChildren();for(const row of evaluations){const li=document.createElement('li');li.textContent=`${row.profile} · ${row.label} · ${row.result.replace('-',' ')} · ${row.staffMinutesEstimate} minutes (manual estimate)`;$('score-rows').append(li);}}
+$('score-form').onsubmit=e=>{e.preventDefault();try{evaluations.push(addEvaluation(evaluations,{label:$('test-label').value,result:$('test-result').value,minutes:$('test-minutes').value},session.profile.name));renderScores();$('score-status').textContent='Manual judgment recorded in this tab only.';}catch(e){$('score-status').textContent=e.message;}};
+$('clear-score').onclick=()=>{evaluations=[];renderScores();$('score-status').textContent='Manual results cleared from this tab. Exported files are unaffected.';};
+$('export-score').onclick=()=>download('Sage_Manual_Pilot_Results.json',JSON.stringify({disclosure:DISCLOSURE,scope:'Tab-local manual tests; staff minutes are estimates of time spent, not measured savings. No independent verification.',results:evaluations},null,2),'application/json');
