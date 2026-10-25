@@ -1,0 +1,27 @@
+{
+  "profiles": [
+    {
+      "id": "civic",
+      "name": "Civic Continuum",
+      "kind": "Public project facts",
+      "intro": "Meet Sage, our business ambassador prototype. Ask about our work and see the evidence behind each answer.",
+      "faqs": [
+        {"id":"mission","question":"What does Civic Continuum do?","aliases":["what do you do","what is civic continuum","tell me about your company","what does your business do","services"],"answer":"Civic Continuum develops prototypes and research around AI accountability, permission controls and human–AI interaction. Sage, Maya Node and Aurora are distinct projects with different stages of development.","sourceLabel":"Sage public partnership dossier","sourceUrl":"https://github.com/mommommy1960-lang/sage-situated-companion/blob/main/docs/SAGE_PUBLIC_PARTNERSHIP_DOSSIER_2026-10-24.md"},
+        {"id":"sage","question":"What can Sage do today?","aliases":["what is sage","tell me about sage","sage capabilities","can sage see","can sage hear"],"answer":"Sage has a companion runtime and a separate browser device demonstrator. Camera preview, location display and speech-to-text have founder-reported tablet observations. Camera preview is not scene understanding; audible replies and full browser-to-runtime integration still have open verification gates.","sourceLabel":"Sage README: demonstrated behavior and limits","sourceUrl":"https://github.com/mommommy1960-lang/sage-situated-companion/blob/main/README.md"},
+        {"id":"privacy","question":"What happens to my information here?","aliases":["privacy","do you store my data","do you record me","are you recording","do you use the camera","what about my privacy"],"answer":"This prototype uses typed text only. It does not request your camera, microphone or location, and sends no question to an AI provider. Chat and approval state stay in this tab's memory and clear on Stop or reload. Optional downloads are files you choose to save. Site hosting may maintain its own access logs.","sourceLabel":"This prototype's implemented data boundary","sourceUrl":""},
+        {"id":"robot","question":"Is a real robot connected?","aliases":["is this a robot","reachy mini","do you control reachy","is reachy connected","is this a simulation"],"answer":"No robot is connected. The drawing is an illustrative browser preview of an ambassador's responses. Reachy SDK integration, MuJoCo simulation and physical-device testing have not been completed by this prototype.","sourceLabel":"Prototype scope","sourceUrl":""},
+        {"id":"availability","question":"Can I buy this service now?","aliases":["price","how much does it cost","pricing","can i buy sage","can i book a pilot","is this production ready"],"answer":"This is an owner-review prototype, not an operating paid service. A proposed limited pilot would need an agreed scope, a working deployment, acceptance tests and written commercial terms before payment or customer launch.","sourceLabel":"Prototype release boundary","sourceUrl":""}
+      ]
+    },
+    {
+      "id":"cycle","name":"Harbor Cycle Studio","kind":"Fictional customer example",
+      "intro":"A fictional bicycle workshop, showing how a small business could answer recurring questions without paid AI calls.",
+      "faqs":[
+        {"id":"hours","question":"What are your hours?","aliases":["hours","when are you open","opening hours","what time do you open"],"answer":"In this fictional example, the workshop opens Tuesday–Saturday, 10 AM–6 PM. These are demonstration hours, not a real business listing.","sourceLabel":"Fictional owner-approved FAQ • sample v1","sourceUrl":""},
+        {"id":"services","question":"What repairs do you offer?","aliases":["what do you do","services","what services do you offer","do you repair bikes","bike repairs"],"answer":"The fictional workshop offers flat-tire repair, brake adjustments and basic bicycle tune-ups. E-bike batteries and electrical systems are outside this example's service scope.","sourceLabel":"Fictional owner-approved FAQ • sample v1","sourceUrl":""},
+        {"id":"prices","question":"How much is a tune-up?","aliases":["price","pricing","tune up price","how much is a tune up","how much does a tune up cost"],"answer":"The sample price for a basic tune-up is $80, with parts and additional work quoted separately. This is a fictional demonstration price, not a live offer.","sourceLabel":"Fictional owner-approved price sheet • sample v1","sourceUrl":""},
+        {"id":"booking","question":"Can you book my bike in?","aliases":["book an appointment","booking","can i book a repair","can you book me in","make an appointment"],"answer":"I cannot book or contact anyone in this prototype. Choose Prepare a handoff to review and download a local draft for a person. No appointment will be created.","sourceLabel":"Prototype action boundary","sourceUrl":""}
+      ]
+    }
+  ]
+}
