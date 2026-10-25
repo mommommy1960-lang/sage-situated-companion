@@ -1,0 +1,7 @@
+# Gemini Live integration checkpoint — October 24, 2026
+
+Site source commit 70527d43a7de56a8d601fe0ae2f6613fe37c8cca deployed. Preserves existing Sage assets via Worker and adds protected token route, native streamed audio playback, microphone PCM capture, explicit up-to-1fps Google frame sharing, interruption playback cancellation, transcriptions and four-minute foreground-only tests. No saved personal notes/location attached to Live. No Google credential has been received or live handshake validated yet.
+
+Protected setup: https://sage-companion-device-lab.myqueen1960.chatgpt.site/live-setup . Owner email allowlist, same-origin POST, password key field, no browser storage, Google credential validation, encrypted D1 storage with encryption master in a Sites secret. Public code contains no permanent key. Server returns short-lived constrained tokens only after owner authentication. Free-tier confirmation is user-reported, not automatic Google billing verification. Setup page rendered successfully in authenticated browser.
+
+Passed: mock token/auth/PCM/Stop tests, encrypted-store round-trip and authorization tests, Worker asset routing, existing speech/tab/vision/memory tests. Real account quota, model availability, WebSocket handshake, spoken stream and real camera/mic remain unverified until owner saves key and test runs. User created Sage Live Test project/key on their own device and was instructed not to put key in chat.
